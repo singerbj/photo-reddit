@@ -1,31 +1,48 @@
+var c = $('#items');
+var p = $('#page');
+var filter = $('#filter');
+
 var randomInt = function(min,max){
     return Math.floor(Math.random()*(max-min+1)+min);
 }
 
+var openUrl = function(url) {
+  $(location).attr('href', url);
+}
+
 var createDiv = function(x, y, width, height, id, item){
-    
-    var r = randomInt(175, 225);
-    $('<div/>', {
-        id: id,
-        class: "item",
-        style: "position: absolute; " +
-                "left: " + x + "px; " +
-                "top: " + y + "px; " +
-                "width: " + width + "px; " +
-                "height: " + height + "px; " +
-                "background-image: url(\"" + 
-                  (item.album === true ? item.thumb : item.url) + 
-                "\");" + 
-                "background-size: cover"
-    }).appendTo('#items');
+    if(item){
+      var div = $('<div/>', {
+          id: id,
+          class: "item",
+          onClick: "openUrl(\"" + item.url  + "\");",
+          style: "position: absolute; " +
+                  "left: " + x + "px; " +
+                  "top: " + y + "px; " +
+                  "width: " + width + "px; " +
+                  "height: " + height + "px; " +
+                  "background-image:" + 
+                  //" url(\"" + item.url + "\"), " + 
+                  " url(\"" + item.thumb + "\"); " + 
+                  "background-size: cover; " +
+                  "background-position: center;"
+
+      });
+      
+      if(item.album === true){
+        var album = $('<div/>', {
+          class: "album"
+        }).appendTo(div);
+      }
+      
+      div.appendTo('#items');
+    }
 };
 
+var maxPerRow;    
 var createGrid = function(list){
   if(list.length > 0){
-    var c = $('#items');
-    var p = $('#page');
-    c.empty();
-    var maxPerRow = 3;    
+    //c.empty();
     var num = list.length;    
     var numRows;
     var lastRowWidth;
@@ -50,51 +67,118 @@ var createGrid = function(list){
             tempCounter = lastRowNum;    
         }
         
-        for(var c = 0; c < tempCounter; c++){            
+        for(var j = 0; j < tempCounter; j++){            
             var id = counter;
-            createDiv(c * tempWidth, r * height, tempWidth, height, id, list[id]);                      
+            createDiv(j * tempWidth, r * height, tempWidth, height, id, list[id]);                      
             counter += 1;
         }
     }
   }
 };
 
+var thumbHash = {};
 var list = [];
-var getList = function(){
-  console.log('getting list');
-  return $.getJSON("http://www.reddit.com/r/" + $('#filter')[0].value + ".json", function(data){
-    list = data.data.children.map(function(child){
-      if(child.data.url && child.data.thumbnail && child.data.thumbnail !== 'self'){
-      console.log(child, child.data.thumbnail);
+var after;
+var getList = function(param){
+  return $.getJSON("http://www.reddit.com/r/" + $('#filter')[0].value + ".json" + param, function(data){
+    var temp = data.data.children.map(function(child){
         var url = child.data.url;
         url = url.replace('gifv', 'gif');
         var album;
+        var image;
         if(url.indexOf('.jpg') < 0 && 
             url.indexOf('.jpeg') < 0 &&
             url.indexOf('.png') < 0 &&
             url.indexOf('.gif') < 0){
-          album = true;
+          if(child.data.thumbnail){
+            album = true;
+          }else{
+            album = false;
+          }
+          image = false;
         }else{
           album = false;
+          image = true;
         }
-
-        var obj = { url: url, thumb: child.data.thumbnail, album: album };
+        var obj = { id: child.data.id, url: url, thumb: child.data.thumbnail, album: album, image: image };
         return obj;
-      }
+    }).filter(function(item){
+      return !thumbHash[item.thumb] && (item.album || item.image) && item.thumb !== 'self' && item.thumb !== 'nsfw' && item.thumb !== "";
     });
+
+    temp.forEach(function(item){
+      list.push(item);
+      thumbHash[item.thumb] = true;
+    });
+    after = data.data.after;
   });
 };
 
 
-$('#filter').keyup(function(e){
-  if(this.value.length > 0){
-    getList().done(function(){
+
+var run = function(){
+  c.empty();
+  if(filter[0].value.length > 0){
+    var p = getList("").promise().then(function(){
       createGrid(list);
     });
   }
+}
+
+//$(document).keypress(function(e) {
+//  if(e.which == 13) {
+//    run();
+//  }
+//});
+
+$('#filter').keyup(function(){
+  list = [];
+  thumbHash = {};
+  run();
+}); 
+
+var id;
+
+var setMaxPerRow = function(){
+    if($(window).width() >= 1300){
+      maxPerRow = 7;
+    }else if($(window).width() >= 1100){
+      maxPerRow = 6;
+    }else if($(window).width() >= 900){
+      maxPerRow = 5;
+    }else if($(window).width() >= 700){
+      maxPerRow = 4;
+    }else if($(window).width() >= 500){
+      maxPerRow = 3;
+    }else{
+      maxPerRow = 2;
+    } 
+}
+setMaxPerRow();
+
+$(window).resize(function() {
+    
+    setMaxPerRow();
+    c.empty();
+    clearTimeout(id);
+    id = setTimeout(run, 500);
 });
 
-$(window).resize(createGrid(list));
+var itemCount = 0;
+var promise;
+$(window).scroll(function() {
+  if(($(window).scrollTop() + $(window).height() == $(document).height()) && !promise && after !== null) {
+    if(filter[0].value.length > 0){
+      promise = getList("?count=" + itemCount + "&after=" + after).promise().then(function(){
+        createGrid(list);
+        itemCount += 25;
+        promise = null;
+      });
+    } 
+  }
+});
+
+//run();
 
 
 

@@ -132,6 +132,7 @@ var run = function(){
 //});
 
 $('#filter').keyup(function(){
+  p.removeAttr("style");
   list = [];
   thumbHash = {};
   run();
@@ -157,7 +158,6 @@ var setMaxPerRow = function(){
 setMaxPerRow();
 
 $(window).resize(function() {
-    
     setMaxPerRow();
     c.empty();
     clearTimeout(id);

@@ -7,13 +7,14 @@ var randomInt = function(min,max){
 }
 
 var openUrl = function(url) {
-  $(location).attr('href', url);
+  window.open(url)
 }
 
 var createDiv = function(x, y, width, height, id, item){
     if(item){
       var div = $('<div/>', {
           id: id,
+          title:item.title,
           class: "item",
           onClick: "openUrl(\"" + item.url  + "\");",
           style: "position: absolute; " +
@@ -42,7 +43,6 @@ var createDiv = function(x, y, width, height, id, item){
 var maxPerRow;    
 var createGrid = function(list){
   if(list.length > 0){
-    //c.empty();
     var num = list.length;    
     var numRows;
     var lastRowWidth;
@@ -73,6 +73,8 @@ var createGrid = function(list){
             counter += 1;
         }
     }
+  } else {
+    c.html("<p>No Images Found for the subreddit /r/"+$('#filter').val());
   }
 };
 
@@ -80,11 +82,10 @@ var thumbHash = {};
 var list = [];
 var after;
 var getList = function(param){
-  return $.getJSON("http://www.reddit.com/r/" + $('#filter')[0].value + ".json" + param, function(data){
+  return $.getJSON("http://www.reddit.com/r/" + $('#filter').val() + ".json" + param, function(data){
     var temp = data.data.children.map(function(child){
-        var url = child.data.url;
-        url = url.replace('gifv', 'gif');
-        var album;
+        var url = child.data.url.replace('gifv', 'gif');
+        var album = false;
         var image;
         if(url.indexOf('.jpg') < 0 && 
             url.indexOf('.jpeg') < 0 &&
@@ -92,15 +93,13 @@ var getList = function(param){
             url.indexOf('.gif') < 0){
           if(child.data.thumbnail){
             album = true;
-          }else{
-            album = false;
           }
           image = false;
         }else{
           album = false;
           image = true;
         }
-        var obj = { id: child.data.id, url: url, thumb: child.data.thumbnail, album: album, image: image };
+        var obj = { id: child.data.id, url: url, thumb: child.data.thumbnail, album: album, image: image,title: child.data.title };
         return obj;
     }).filter(function(item){
       return !thumbHash[item.thumb] && (item.album || item.image) && item.thumb !== 'self' && item.thumb !== 'nsfw' && item.thumb !== "";
@@ -118,19 +117,15 @@ var getList = function(param){
 
 var run = function(){
   c.empty();
-  if(filter[0].value.length > 0){
+  if(filter.val().length > 0){
     var p = getList("").promise().then(function(){
       createGrid(list);
     });
   }
 }
-
-//$(document).keypress(function(e) {
-//  if(e.which == 13) {
-//    run();
-//  }
-//});
-
+$('#filter').click(function() {
+  $(this).val("");
+});
 $('#filter').keyup(function(){
   p.removeAttr("style");
   list = [];
@@ -168,7 +163,7 @@ var itemCount = 0;
 var promise;
 $(window).scroll(function() {
   if(($(window).scrollTop() + $(window).height() == $(document).height()) && !promise && after !== null) {
-    if(filter[0].value.length > 0){
+    if(filter.val().length > 0){
       promise = getList("?count=" + itemCount + "&after=" + after).promise().then(function(){
         createGrid(list);
         itemCount += 25;
@@ -177,15 +172,3 @@ $(window).scroll(function() {
     } 
   }
 });
-
-//run();
-
-
-
-
-
-
-
-
-
-
